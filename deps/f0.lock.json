@@ -6,8 +6,8 @@
       "candidates": [
         "nuttx"
       ],
-      "remote": "https://github.com/78/nuttx.git",
-      "commit": "2e9211a2726c5729649aaf9f1215e8dbd8d40dc1",
+      "remote": "https://github.com/Jiangyafeng/nuttx.git",
+      "commit": "37709e0bdad9012e26b5524144e26b94fa7aa2ae",
       "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "untracked_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -16,7 +16,7 @@
       "candidates": [
         "nuttx-apps"
       ],
-      "remote": "https://github.com/78/nuttx-apps.git",
+      "remote": "https://github.com/Jiangyafeng/nuttx-apps.git",
       "commit": "fa2c8b65c396c9ebcd10d59539857b127b57e500",
       "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "untracked_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
