@@ -14,7 +14,9 @@ platform, SDK, cloud service, or product UI.
 - Sv32 virtual memory, cached PSRAM address spaces, and cross-core TLB
   shootdown
 - LittleFS-backed AppFS with ELF and SHA-256 validation
-- Wi-Fi station mode, DHCP, DNS, NTP, TCP, TLS, and HTTP
+- Wi-Fi station, SoftAP, and concurrent STA + SoftAP coexistence modes
+- DHCP client/server (`renew`/`dhcpd`), DNS, NTP, TCP, TLS, HTTP, and IPv4
+  forwarding/NAT (`iptables`)
 - Automated boot, isolation, SMP, network, TLB, and multi-process regression
 
 ## Console demonstration
@@ -105,7 +107,7 @@ shallow history:
 
 ```sh
 git clone --depth 1 --recurse-submodules --shallow-submodules \
-  https://github.com/78/nuttx-esp32s31.git
+  https://github.com/Jiangyafeng/nuttx-esp32s31.git
 cd nuttx-esp32s31
 ```
 
@@ -134,16 +136,70 @@ The default production output is written to `out/esp32s31-production/`.
 `nuttx.bin` and `appfs.img` form one ABI-matched image set and must always be
 built, distributed, and flashed together.
 
-To build the validation profile with the regression applications enabled:
+Select another board profile with `S31_PROFILE`:
+
+| Profile | Output directory | Description |
+| --- | --- | --- |
+| `production` | `out/esp32s31-production` | Default Wi-Fi Station (`wlan0`) production image |
+| `softap` | `out/esp32s31-softap` | Wi-Fi SoftAP (`wlan0`, `192.168.4.1/24`) with `dhcpd` |
+| `sta_softap` | `out/esp32s31-sta_softap` | Concurrent Station (`wlan0`) + SoftAP (`wlan1`) with `dhcpd` and IPv4 NAT (`iptables`) |
+| `validation` | `out/esp32s31-validation` | Production plus bounded hardware regression applications |
 
 ```sh
+S31_PROFILE=softap ./build.sh
+S31_PROFILE=sta_softap ./build.sh
 S31_PROFILE=validation ./build.sh
 ```
 
+## Wi-Fi SoftAP and AP + STA coexistence
+
+### SoftAP mode (`softap` profile)
+
+`wlan0` starts in SoftAP mode on boot with default SSID `ESP32S31-AP` and IP
+`192.168.4.1/24`. Start the DHCP server to assign leases (`192.168.4.2+`) to
+connecting stations, and optionally customize credentials or channel via `wapi`:
+
+```console
+nsh> ifconfig wlan0
+nsh> dhcpd wlan0 &
+nsh> wapi psk wlan0 <ap-password> 3
+nsh> wapi essid wlan0 <ap-ssid> 1
+nsh> wapi freq wlan0 6 1
+nsh> wapi show wlan0
+```
+
+### Concurrent Station + SoftAP mode (`sta_softap` profile)
+
+`wlan0` is the Station interface and `wlan1` is the SoftAP interface (each with
+a distinct MAC address; SoftAP uses `192.168.4.1/24` with `SO_BINDTODEVICE` so
+`dhcpd` and `renew` operate independently):
+
+```console
+# Bring up SoftAP and start DHCP server on wlan1
+nsh> ifup wlan1
+nsh> dhcpd wlan1 &
+nsh> wapi psk wlan1 <ap-password> 3
+nsh> wapi essid wlan1 <ap-ssid> 1
+
+# Concurrently associate Station wlan0 to an upstream AP
+nsh> ifup wlan0
+nsh> wapi scan wlan0
+nsh> wapi psk wlan0 <wifi-password> 3 2
+nsh> wapi essid wlan0 <wifi-ssid> 1
+nsh> renew wlan0
+
+# Optional: enable IPv4 NAT so SoftAP clients reach the upstream network
+nsh> iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+nsh> ifconfig
+```
+
+Either interface can be stopped and restarted independently with `ifdown`/`ifup`
+without disrupting the other.
+
 ## Flashing
 
-For the maintained production and validation profiles, flash both images from
-the same output directory:
+For all maintained profiles (`production`, `softap`, `sta_softap`, and
+`validation`), flash both images from the same output directory:
 
 | Image | Flash offset | Purpose |
 | --- | --- | --- |
@@ -158,8 +214,9 @@ offsets from the build configuration and write the matching image pair:
 ESPTOOL_PORT=/dev/ttyACM0 cmake --build out/esp32s31-production --target flash
 ```
 
-Use `out/esp32s31-validation` for the validation profile. Replace the example
-serial path with the actual device on your host.
+Replace `out/esp32s31-production` with `out/esp32s31-softap`,
+`out/esp32s31-sta_softap`, or `out/esp32s31-validation` for other profiles, and
+replace the example serial path with the actual device on your host.
 
 - The board's native USB Serial/JTAG interface is used for flashing and the
   NuttX USB console (`CONFIG_ESPRESSIF_USBSERIAL`). On Linux it commonly appears
